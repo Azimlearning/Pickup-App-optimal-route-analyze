@@ -1,0 +1,19 @@
+{
+  "hosting": {
+    "public": "optimal-route-kl/frontend/dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/**",
+        "run": {
+          "serviceId": "optimal-route-kl-api",
+          "region": "us-central1"
+        }
+      }
+    ]
+  }
+}

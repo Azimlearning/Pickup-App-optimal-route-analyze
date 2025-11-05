@@ -1,0 +1,6 @@
+Flask
+googlemaps
+requests
+python-dotenv
+Flask-Cors
+gunicorn

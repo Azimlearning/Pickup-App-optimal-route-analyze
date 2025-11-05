@@ -1,3 +1,4 @@
+
 # To learn more about how to use Nix to configure your environment
 # see: https://developers.google.com/idx/guides/customize-idx-env
 { pkgs, ... }: {
@@ -18,9 +19,10 @@
     workspace = {
       # Runs when a workspace is first created with this `dev.nix` file
       onCreate = {
-        npm-install = "npm i --no-audit --no-progress --timing";
-        # Open editors for the following files by default, if they exist:
-        default.openFiles = [ "src/App.tsx" "src/App.ts" "src/App.jsx" "src/App.js" ];
+        # Change directory and install dependencies for the correct app
+        npm-install = "cd optimal-route-kl/frontend && npm i --no-audit --no-progress --timing";
+        # Open the correct App.jsx by default
+        default.openFiles = [ "optimal-route-kl/frontend/src/App.jsx" ];
       };
       # To run something each time the workspace is (re)started, use the `onStart` hook
     };
@@ -30,6 +32,8 @@
       previews = {
         web = {
           command = ["npm" "run" "dev" "--" "--port" "$PORT" "--host" "0.0.0.0"];
+          # Specify the correct directory for the preview server
+          dir = "optimal-route-kl/frontend";
           manager = "web";
         };
       };
