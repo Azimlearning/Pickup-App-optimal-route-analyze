@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
  */
 
 export default function RoutePlanner() {
-  const [locations, setLocations] = useState(["", ""]);
+  const [locations, setLocations] = useState(["", "", ""]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -58,6 +58,17 @@ export default function RoutePlanner() {
     }
   }
 
+  // Helper function to get appropriate placeholder text
+  function getPlaceholder(idx) {
+    if (idx === 0) {
+      return "Starting point (address or lat,lng)";
+    } else if (idx === locations.length - 1 && locations.length > 1) {
+      return "Destination (address or lat,lng)";
+    } else {
+      return `Pickup point ${idx} (address or lat,lng)`;
+    }
+  }
+
   return (
     <div className="bg-white rounded shadow p-6">
       <form onSubmit={submit}>
@@ -68,10 +79,10 @@ export default function RoutePlanner() {
                 type="text"
                 value={loc}
                 onChange={(e) => updateLocation(idx, e.target.value)}
-                placeholder={`Location ${idx + 1} (address or lat,lng)`}
+                placeholder={getPlaceholder(idx)}
                 className="flex-1 p-2 border rounded"
               />
-              {locations.length > 1 && (
+              {locations.length > 2 && idx !== 0 && idx !== locations.length - 1 && (
                 <button
                   type="button"
                   onClick={() => removeLocation(idx)}
@@ -113,9 +124,58 @@ export default function RoutePlanner() {
           {error && <div className="text-sm text-red-600 mt-2">{error}</div>}
 
           {result && (
-            <div className="mt-4 p-3 bg-gray-50 border rounded text-sm">
-              <strong>Route result:</strong>
-              <pre className="text-xs mt-2 overflow-auto">{JSON.stringify(result, null, 2)}</pre>
+            <div className="mt-4 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-indigo-200 rounded-lg">
+              <h3 className="text-lg font-semibold text-indigo-900 mb-3">✓ Optimized Route</h3>
+              
+              {/* Optimized Order */}
+              <div className="mb-4">
+                <p className="text-sm font-medium text-gray-700 mb-2">📍 Route Order:</p>
+                <div className="space-y-1">
+                  {result.route && result.route.map((point, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-sm">
+                      <span className="flex-shrink-0 w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                        {idx + 1}
+                      </span>
+                      <span className="text-gray-800 font-medium">{point.input}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Leg-by-Leg Breakdown */}
+              {result.legs && result.legs.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-sm font-medium text-gray-700 mb-2">🚗 Travel Breakdown:</p>
+                  <div className="space-y-2">
+                    {result.legs.map((leg, idx) => (
+                      <div key={idx} className="bg-white p-3 rounded border border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-800">
+                              Step {leg.step}: {leg.from} → {leg.to}
+                            </p>
+                          </div>
+                          <div className="flex gap-3 text-xs text-gray-600">
+                            <span className="font-semibold">{leg.distance_km} km</span>
+                            <span className="font-semibold">{leg.time_minutes} min</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Total Summary */}
+              <div className="pt-3 border-t border-indigo-200">
+                <div className="flex items-center justify-between bg-indigo-100 p-3 rounded">
+                  <span className="text-sm font-bold text-indigo-900">Total Journey:</span>
+                  <div className="flex gap-4 text-sm font-bold text-indigo-900">
+                    <span>📏 {result.total_distance_km} km</span>
+                    <span>⏱️ {result.total_time_minutes} mins</span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

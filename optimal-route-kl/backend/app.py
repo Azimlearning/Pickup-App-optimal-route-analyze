@@ -49,7 +49,7 @@ suggest ideal travel times, and mention any interesting landmarks.
                 "Content-Type": "application/json"
             },
             json={
-                "model": "google/gemini-pro",
+                "model": "openai/gpt-4",
                 "messages": [{"role": "user", "content": prompt}],
                 "response_format": {"type": "json_object"} # Request JSON output
             }
@@ -79,6 +79,138 @@ def status():
     return jsonify({
         "status": "Backend is running and Google Maps client initialized successfully."
     })
+
+
+@app.route('/api/optimize', methods=['POST'])
+def optimize():
+    """Optimized route endpoint - uses Google Routes API to find best order for waypoints"""
+    if gmaps is None:
+        return jsonify({'error': 'Google Maps client is not initialized. Check API Key.'}), 500
+
+    data = request.get_json()
+    locations = data.get('locations', [])
+
+    if not locations or len(locations) < 2:
+        return jsonify({'error': 'Provide at least two locations'}), 400
+
+    # Extract start, destination, and waypoints
+    start_location = locations[0]
+    final_destination = locations[-1]
+    waypoints = locations[1:-1] if len(locations) > 2 else []
+
+    try:
+        headers = {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": os.environ.get("MAPS_API_KEY"),
+            "X-Goog-FieldMask": "routes.optimizedIntermediateWaypointIndex,routes.duration,routes.distanceMeters,routes.legs"
+        }
+
+        payload = {
+            "origin": {"address": start_location},
+            "destination": {"address": final_destination},
+            "travelMode": "DRIVE",
+        }
+
+        # Only add intermediates if there are waypoints
+        if waypoints:
+            payload["intermediates"] = [{"address": loc} for loc in waypoints]
+            payload["optimizeWaypointOrder"] = True
+
+        response = requests.post(
+            "https://routes.googleapis.com/directions/v2:computeRoutes",
+            json=payload,
+            headers=headers
+        )
+        response.raise_for_status()
+
+        directions_result = response.json()
+
+        if not directions_result or 'routes' not in directions_result or not directions_result['routes']:
+            return jsonify({'error': 'Could not calculate the route using Routes API'}), 500
+
+        route_data = directions_result['routes'][0]
+        
+        # Get duration and distance
+        duration_str = route_data.get('duration', "0s")
+        total_time_seconds = int(re.sub(r's$', '', duration_str))
+        total_time_minutes = round(total_time_seconds / 60, 1)
+        
+        distance_meters = route_data.get('distanceMeters', 0)
+        distance_km = round(distance_meters / 1000, 2)
+
+        # Build optimized route sequence
+        optimized_order = route_data.get('optimizedIntermediateWaypointIndex', [])
+        
+        route = []
+        # Add starting point
+        route.append({'input': start_location, 'coord': None})
+        
+        # Add optimized waypoints
+        if waypoints:
+            for idx in optimized_order:
+                route.append({'input': waypoints[idx], 'coord': None})
+        
+        # Add destination
+        route.append({'input': final_destination, 'coord': None})
+
+        # Extract actual coordinates from route legs and build detailed breakdown
+        legs = route_data.get('legs', [])
+        leg_details = []
+        
+        if legs:
+            coord_idx = 0
+            for i, leg in enumerate(legs):
+                # Add start location coordinate
+                if coord_idx < len(route) and 'startLocation' in leg:
+                    loc = leg['startLocation']['latLng']
+                    route[coord_idx]['coord'] = {'lat': loc['latitude'], 'lng': loc['longitude']}
+                
+                # Extract leg details
+                leg_duration = leg.get('duration', '0s')
+                leg_time_seconds = int(re.sub(r's$', '', leg_duration))
+                leg_time_minutes = round(leg_time_seconds / 60, 1)
+                
+                leg_distance_meters = leg.get('distanceMeters', 0)
+                leg_distance_km = round(leg_distance_meters / 1000, 2)
+                
+                # Determine from/to locations
+                from_location = route[coord_idx]['input'] if coord_idx < len(route) else "Unknown"
+                to_location = route[coord_idx + 1]['input'] if coord_idx + 1 < len(route) else "Unknown"
+                
+                leg_details.append({
+                    'step': i + 1,
+                    'from': from_location,
+                    'to': to_location,
+                    'distance_km': leg_distance_km,
+                    'time_minutes': leg_time_minutes
+                })
+                
+                coord_idx += 1
+            
+            # Add final destination coordinate
+            if legs and 'endLocation' in legs[-1] and coord_idx < len(route):
+                loc = legs[-1]['endLocation']['latLng']
+                route[coord_idx]['coord'] = {'lat': loc['latitude'], 'lng': loc['longitude']}
+
+        return jsonify({
+            'route': route,
+            'legs': leg_details,
+            'summary': f'Optimized route: {distance_km}km, {total_time_minutes} mins',
+            'total_distance_km': distance_km,
+            'total_time_minutes': total_time_minutes
+        })
+
+    except requests.exceptions.HTTPError as http_err:
+        try:
+            error_details = http_err.response.json()
+        except ValueError:
+            error_details = http_err.response.text
+        return jsonify({
+            'error': "An HTTP error occurred while calling the Routes API.",
+            'details': error_details
+        }), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/optimize_route', methods=['POST'])
