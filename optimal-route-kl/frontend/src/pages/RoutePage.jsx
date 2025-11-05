@@ -1,108 +1,117 @@
-
+ 
 import React from 'react';
-import { useLocation } from 'react-router-dom';
-import { FaMapMarkerAlt, FaCar, FaClock, FaExclamationTriangle, FaCheckCircle } from 'react-icons/fa';
+import { useLocation, Link } from 'react-router-dom';
+import { FaMapMarkerAlt, FaCar, FaClock, FaRoute, FaArrowLeft } from 'react-icons/fa';
 
-// Component to display the final optimized route and advisory
+// --- Main Route Page Component ---
 const RoutePage = () => {
     const location = useLocation();
-    const routeData = location.state?.routeData; // Safely access nested state
+    const routeData = location.state?.routeData;
 
     // --- Safety and Loading Check ---
-    if (!routeData) {
+    if (!routeData || !routeData[0]) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-50">
-                <p className="text-xl text-red-600">
+            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+                <p className="text-xl text-red-600 mb-4">
                     Error: Could not load route data. Please go back and optimize the route again.
                 </p>
+                <Link to="/" className="text-indigo-600 hover:underline flex items-center">
+                    <FaArrowLeft className="mr-2" />
+                    Go Back to Home
+                </Link>
             </div>
         );
     }
 
-    // --- Destructure Data for Cleaner Access ---
-    const { 
-        optimal_sequence, 
-        total_time_minutes, 
-        llm_analysis, 
-        llm_buffer_minutes 
-    } = routeData;
+    const route = routeData[0];
+    const legs = route.legs;
 
-    const totalTimeWithBuffer = (total_time_minutes || 0) + (llm_buffer_minutes || 0);
+    // --- Calculate total distance and duration ---
+    const totalDistance = legs.reduce((acc, leg) => acc + leg.distance.value, 0);
+    const totalDuration = legs.reduce((acc, leg) => acc + leg.duration.value, 0);
 
-    // --- Helper function for dynamic route labels ---
-    const getRouteLabel = (index, totalLength) => {
-        if (index === 0) return { label: "STARTING POINT", color: "text-green-600", icon: <FaCheckCircle /> };
-        if (index === totalLength - 1) return { label: "FINAL DESTINATION", color: "text-red-600", icon: <FaMapMarkerAlt /> };
-        return { label: `PICKUP POINT ${index}`, color: "text-blue-600", icon: <FaCar /> };
+    const formatDistance = (distanceInMeters) => {
+        const distanceInKm = distanceInMeters / 1000;
+        return `${distanceInKm.toFixed(2)} km`;
+    };
+
+    const formatDuration = (durationInSeconds) => {
+        const minutes = Math.floor(durationInSeconds / 60);
+        const hours = Math.floor(minutes / 60);
+        const remainingMinutes = minutes % 60;
+        if (hours > 0) {
+            return `${hours}h ${remainingMinutes}m`;
+        }
+        return `${minutes}m`;
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 p-4 sm:p-8">
-            <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-lg overflow-hidden">
-                <header className="bg-indigo-700 text-white p-5">
-                    <h1 className="text-3xl font-extrabold tracking-tight">Your Optimized Route</h1>
-                    <p className="mt-1 text-indigo-200">The most efficient path based on real-time KL traffic.</p>
+        <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
+            <div className="max-w-4xl mx-auto">
+                <header className="bg-indigo-800 text-white p-6 rounded-t-lg shadow-lg">
+                    <h1 className="text-3xl font-extrabold">Your Optimized Route</h1>
+                    <p className="mt-1 text-indigo-200">{route.summary}</p>
                 </header>
 
-                {/* --- 🗺️ Optimized Route List --- */}
-                <section className="p-6 border-b border-gray-100">
-                    <h2 className="text-xl font-bold mb-4 flex items-center text-gray-800">
-                        <FaMapMarkerAlt className="mr-2 text-indigo-500" /> Route Details ({optimal_sequence.length} Stops)
-                    </h2>
-                    
-                    <ol className="list-none pl-0 space-y-4">
-                        {optimal_sequence.map((locationName, index) => {
-                            const { label, color, icon } = getRouteLabel(index, optimal_sequence.length);
-                            return (
-                                <li 
-                                    key={index} 
-                                    className="flex items-center p-3 border border-gray-200 rounded-lg bg-white"
-                                >
-                                    <div className={`mr-4 text-lg ${color}`}>{icon}</div>
-                                    <div className="flex flex-col">
-                                        <span className={`text-xs font-bold uppercase ${color}`}>{label}</span>
-                                        <span className="text-base text-gray-700 font-semibold">{locationName}</span>
-                                    </div>
-                                </li>
-                            );
-                        })}
-                    </ol>
-                </section>
-
-                {/* --- ⏱️ Time Summary --- */}
-                <section className="p-6 border-b border-gray-100 bg-indigo-50">
-                    <h2 className="text-xl font-bold mb-4 flex items-center text-gray-800">
-                        <FaClock className="mr-2 text-indigo-700" /> Estimated Travel Time
-                    </h2>
-                    <div className="space-y-3">
-                        <p className="text-lg text-gray-700 flex justify-between">
-                            <span>Base Optimal Time:</span>
-                            <span className="font-semibold">{total_time_minutes ? `${total_time_minutes.toFixed(1)} min` : 'N/A'}</span>
-                        </p>
-                        <p className="text-lg text-gray-700 flex justify-between">
-                            <span className="font-medium text-red-600">AI Suggested Traffic Buffer:</span>
-                            <span className="font-bold text-red-600">{llm_buffer_minutes ? `+${llm_buffer_minutes} min` : '0 min'}</span>
-                        </p>
-                        <div className="border-t pt-3 mt-3">
-                            <p className="text-2xl font-extrabold flex justify-between text-indigo-800">
-                                <span>TOTAL ESTIMATED TIME:</span>
-                                <span>{totalTimeWithBuffer.toFixed(1)} min</span>
-                            </p>
+                <div className="bg-white shadow-lg rounded-b-lg p-6">
+                    {/* --- Overall Route Summary --- */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 text-center">
+                        <div className="p-4 bg-indigo-50 rounded-lg">
+                            <FaRoute className="text-indigo-600 text-3xl mx-auto mb-2" />
+                            <h3 className="text-lg font-semibold text-gray-800">Total Distance</h3>
+                            <p className="text-2xl font-bold text-indigo-800">{formatDistance(totalDistance)}</p>
+                        </div>
+                        <div className="p-4 bg-green-50 rounded-lg">
+                            <FaClock className="text-green-600 text-3xl mx-auto mb-2" />
+                            <h3 className="text-lg font-semibold text-gray-800">Total Duration</h3>
+                            <p className="text-2xl font-bold text-green-800">{formatDuration(totalDuration)}</p>
+                        </div>
+                        <div className="p-4 bg-blue-50 rounded-lg">
+                            <FaCar className="text-blue-600 text-3xl mx-auto mb-2" />
+                            <h3 className="text-lg font-semibold text-gray-800">Number of Stops</h3>
+                            <p className="text-2xl font-bold text-blue-800">{legs.length + 1}</p>
                         </div>
                     </div>
-                </section>
 
-                {/* --- 🗣️ Travel Advisory (LLM Output) --- */}
-                <section className="p-6">
-                    <h2 className="text-xl font-bold mb-4 flex items-center text-gray-800">
-                        <FaExclamationTriangle className="mr-2 text-yellow-600" /> AI Travel Advisory
-                    </h2>
-                    <div className="p-4 bg-yellow-50 border border-yellow-300 rounded-lg shadow-inner">
-                        <p className="text-gray-700 leading-relaxed italic">
-                            {llm_analysis || "LLM Advisory is currently unavailable or still processing."}
-                        </p>
+                    {/* --- Turn-by-Turn Directions for each Leg --- */}
+                    <div>
+                        <h2 className="text-2xl font-bold mb-4 text-gray-800">Turn-by-Turn Directions</h2>
+                        {legs.map((leg, legIndex) => (
+                            <div key={legIndex} className="mb-8 p-6 bg-gray-50 rounded-lg shadow-md">
+                                <h3 className="text-xl font-bold mb-4 flex items-center text-indigo-700">
+                                    <FaMapMarkerAlt className="mr-3" />
+                                    Leg {legIndex + 1}: {leg.start_address} to {leg.end_address}
+                                </h3>
+                                <div className="pl-6 border-l-4 border-indigo-200">
+                                    {leg.steps.map((step, stepIndex) => (
+                                        <div key={stepIndex} className="py-2 flex items-start">
+                                            <div className="mr-4 text-indigo-500 font-bold">{stepIndex + 1}.</div>
+                                            <div
+                                                className="text-gray-700"
+                                                dangerouslySetInnerHTML={{ __html: step.html_instructions }}
+                                            />
+                                            <div className="ml-auto text-right text-sm text-gray-500">
+                                                <p>{step.distance.text}</p>
+                                                <p>({step.duration.text})</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-4 text-right font-semibold text-gray-700">
+                                    <p>Leg Distance: {leg.distance.text}</p>
+                                    <p>Leg Duration: {leg.duration.text}</p>
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                </section>
+
+                    <div className="text-center mt-8">
+                        <Link to="/" className="text-indigo-600 hover:underline flex items-center justify-center">
+                            <FaArrowLeft className="mr-2" />
+                            Calculate Another Route
+                        </Link>
+                    </div>
+                </div>
             </div>
         </div>
     );
