@@ -11,8 +11,12 @@
         "source": "/api/**",
         "run": {
           "serviceId": "optimal-route-kl-api",
-          "region": "us-central1"
+          "region": "asia-southeast1"
         }
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
       }
     ]
   }
